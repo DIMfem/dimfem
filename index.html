@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sorteo de equipos DIM FEM</title>
+<meta name="description" content="Marca quiénes vinieron y arma equipos parejos en segundos.">
+<link rel="icon" href="Escudo_DIM.webp">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #1b3a6b;
+    --navy-dark: #122a50;
+    --navy-light: #e7edf7;
+    --yellow: #facc15;
+    --yellow-dark: #5c4400;
+    --bg: #eef1f6;
+    --line: #d9dee8;
+    --gray-text: #5f6673;
+    --dark: #1a1a1a;
+    --red: #d64545;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Barlow', sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; font-size: 15px; }
+  button, input { font-family: inherit; }
+
+  .header { background: var(--navy); padding: 12px 18px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 100; border-bottom: 3px solid var(--yellow); }
+  .header img { width: 54px; height: 54px; border-radius: 50%; background: #fff; object-fit: contain; flex-shrink: 0; }
+  .header-title { font-family: 'Barlow Condensed', sans-serif; text-transform: uppercase; line-height: 1; color: #fff; font-size: 22px; font-weight: 700; letter-spacing: 0.03em; }
+  .header-title span { display: block; color: var(--yellow); font-size: 28px; }
+
+  .main { max-width: 560px; margin: 0 auto; padding: 18px 14px 48px; }
+
+  .step-label { font-family: 'Barlow Condensed', sans-serif; font-size: 16px; font-weight: 600; color: var(--navy); margin-bottom: 8px; }
+
+  .box { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .box-title { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+  .box-sub { font-size: 13px; color: var(--gray-text); margin-bottom: 10px; line-height: 1.5; }
+
+  .btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px; border: none; border-radius: 12px; font-family: 'Barlow Condensed', sans-serif; font-size: 21px; font-weight: 700; letter-spacing: 0.03em; cursor: pointer; }
+  .btn-navy { background: var(--navy); color: #fff; }
+  .btn-navy:hover { background: var(--navy-dark); }
+  .btn-wa { background: #25d366; color: #fff; }
+  .btn-wa:hover { background: #1ebe5c; }
+  .btn-outline { background: #fff; color: var(--navy); border: 2px solid var(--navy); font-size: 18px; padding: 12px; }
+  .btn-outline:hover { background: var(--navy-light); }
+  .btn-stack { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+  .link-btn { background: none; border: none; color: var(--gray-text); font-size: 14px; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 8px; display: block; margin: 6px auto 0; }
+
+  .error { color: var(--red); font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+  .notice { background: #fff8db; border: 1px solid #f2d55a; border-radius: 10px; padding: 10px 12px; font-size: 14px; color: #7a5c00; margin-bottom: 12px; line-height: 1.5; }
+  .notice button { margin-top: 8px; background: var(--navy); color: #fff; border: none; border-radius: 8px; padding: 8px 12px; font-size: 14px; font-weight: 600; cursor: pointer; }
+
+  /* ASISTENCIA */
+  .att-tools { display: flex; gap: 8px; margin-bottom: 10px; }
+  .att-tools button { background: #fff; border: 1.5px solid var(--navy); color: var(--navy); border-radius: 8px; padding: 6px 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+  .att-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+  .att { border: 1.5px solid var(--line); background: #fff; border-radius: 9px; padding: 10px 9px; font-size: 14px; font-weight: 500; color: #555; cursor: pointer; text-align: left; display: flex; align-items: center; gap: 5px; min-width: 0; }
+  .att .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .att .ck { width: 16px; flex-shrink: 0; font-weight: 700; }
+  .att.on { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .att.guest { border-style: dashed; }
+  .guest-row { display: flex; gap: 8px; }
+  .guest-row input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-size: 15px; outline: none; }
+  .guest-row input:focus { border-color: var(--navy); }
+  .guest-row button { background: var(--navy); color: #fff; border: none; border-radius: 8px; padding: 0 16px; font-size: 15px; font-weight: 600; cursor: pointer; }
+  .guest-list { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 6px; }
+  .guest-chip { background: var(--navy-light); color: var(--navy); border-radius: 20px; padding: 5px 6px 5px 12px; font-size: 14px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+  .guest-chip button { background: none; border: none; color: var(--red); font-size: 15px; cursor: pointer; padding: 0 5px; }
+
+  /* AJUSTES */
+  .help { background: var(--navy-light); border-radius: 8px; padding: 9px 12px; font-size: 13px; color: var(--navy); line-height: 1.55; margin-bottom: 10px; }
+  .p-row { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid #eef1f6; }
+  .p-row:last-child { border-bottom: none; }
+  .p-name { flex: 1; min-width: 0; font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .p-btn { border: 1px solid var(--line); background: #fff; border-radius: 7px; height: 34px; min-width: 40px; padding: 0 6px; font-size: 15px; cursor: pointer; flex-shrink: 0; color: #bbb; }
+  .p-btn.gk { filter: grayscale(1); opacity: 0.45; }
+  .p-btn.gk.on { filter: none; opacity: 1; background: var(--navy-light); border-color: var(--navy); }
+  .p-btn.lvl { font-size: 14px; letter-spacing: 1px; min-width: 60px; }
+  .p-btn.lvl .s-on { color: #e0a800; }
+  .p-btn.lvl.on { border-color: #e0b800; background: #fffbea; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { border: 1.5px solid var(--line); background: #fff; border-radius: 20px; padding: 7px 18px; font-size: 15px; font-weight: 600; cursor: pointer; color: #444; }
+  .chip.on { border-color: var(--navy); background: var(--navy); color: #fff; }
+
+  .color-row { padding: 9px 0; border-bottom: 1px solid #eef1f6; }
+  .color-row:last-child { border-bottom: none; }
+  .color-label { font-size: 13px; font-weight: 600; color: var(--gray-text); margin-bottom: 6px; }
+  .c-opt { border: 1.5px solid var(--line); background: #fff; border-radius: 8px; padding: 6px 11px; font-size: 14px; font-weight: 600; cursor: pointer; color: #555; }
+  .c-opt.peto.on { background: var(--yellow); border-color: #e0b800; color: var(--yellow-dark); }
+  .c-opt.sin.on { background: #fff; border: 2px solid var(--navy); color: var(--navy); }
+  .c-other { border: 1.5px solid var(--line); border-radius: 8px; padding: 6px 10px; font-size: 14px; width: 150px; outline: none; }
+  .c-other.on { border: 2px solid #5f6b7a; font-weight: 600; }
+
+  /* RESULTADO */
+  .team-card { background: #fff; border: 1.5px solid var(--line); border-radius: 12px; overflow: hidden; margin-bottom: 12px; }
+  .team-head { display: flex; align-items: center; gap: 10px; padding: 10px 16px; }
+  .team-name { font-family: 'Barlow Condensed', sans-serif; font-size: 23px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
+  .team-count { margin-left: auto; font-size: 13px; opacity: 0.85; }
+  .team-list { list-style: none; padding: 4px 16px 8px; }
+  .team-list li { padding: 7px 0; border-bottom: 1px solid #eef1f6; font-size: 16px; font-weight: 500; }
+  .team-list li:last-child { border-bottom: none; }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); background: var(--dark); color: #fff; padding: 11px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 300; max-width: calc(100vw - 32px); text-align: center; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .hidden { display: none !important; }
+  .footer { text-align: center; font-size: 12px; color: var(--gray-text); margin-top: 26px; }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <img src="Escudo_DIM.webp" alt="Escudo Deportivo Iván Mayo">
+  <div class="header-title">Sorteo de equipos<span>DIM FEM</span></div>
+</div>
+
+<div class="main">
+
+  <!-- PASO 1: ASISTENCIA -->
+  <section id="step1">
+    <div class="step-label">Paso 1 de 3 · ¿Quiénes vinieron?</div>
+    <div class="box">
+      <div class="box-title" id="att-title">Asistencia</div>
+      <div class="att-tools">
+        <button onclick="markAll(true)">Marcar todas</button>
+        <button onclick="markAll(false)">Desmarcar todas</button>
+      </div>
+      <div class="att-grid" id="att-grid"></div>
+    </div>
+    <div class="box">
+      <div class="box-title">¿Vino alguien que no está en la lista?</div>
+      <div class="guest-row">
+        <input id="guest-input" type="text" placeholder="Nombre de la invitada" onkeydown="if(event.key==='Enter')addGuest()">
+        <button onclick="addGuest()">Agregar</button>
+      </div>
+      <div class="guest-list" id="guest-list"></div>
+    </div>
+    <div id="notice1"></div>
+    <div id="err1" class="error hidden"></div>
+    <button class="btn btn-navy" onclick="goStep2()">Continuar</button>
+  </section>
+
+  <!-- PASO 2: AJUSTES -->
+  <section id="step2" class="hidden">
+    <div class="step-label">Paso 2 de 3 · Ajustes</div>
+    <div class="box">
+      <div class="box-title" id="players-title">Jugadoras</div>
+      <div class="help"><strong>Opcional:</strong> marca 🧤 a las arqueras y toca las estrellas para indicar el nivel de cada jugadora (★ básico, ★★ medio, ★★★ crack). Así el sorteo reparte parejo. Si no marcas nada, el sorteo es 100% al azar.</div>
+      <div id="players-list"></div>
+    </div>
+    <div class="box">
+      <div class="box-title">Cantidad de equipos</div>
+      <div class="chips" id="teams-chips"></div>
+    </div>
+    <div id="notice2"></div>
+    <div class="box">
+      <div class="box-title">Colores</div>
+      <div id="colors-wrap"></div>
+    </div>
+    <div id="err2" class="error hidden"></div>
+    <button class="btn btn-navy" onclick="sortear()">⚽ Sortear equipos</button>
+    <button class="link-btn" onclick="showStep(1)">Volver a la asistencia</button>
+  </section>
+
+  <!-- PASO 3: RESULTADO -->
+  <section id="step3" class="hidden">
+    <div class="step-label">Paso 3 de 3 · Equipos listos</div>
+    <div id="result-teams"></div>
+    <div class="btn-stack">
+      <button class="btn btn-wa" onclick="shareImage()">📷 Compartir imagen</button>
+      <button class="btn btn-wa" onclick="copyText()">📋 Copiar texto</button>
+      <button class="btn btn-outline" onclick="sortear()">🔀 Sortear de nuevo</button>
+    </div>
+    <button class="link-btn" onclick="showStep(2)">Editar jugadoras u opciones</button>
+  </section>
+
+  <div class="footer">Sorteo de equipos DIM FEM · Deportivo Iván Mayo</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIGURACIÓN ─────────────────────────────────────────────
+const SHARE_URL = 'dimfem.github.io/dimfem';
+const LOGO_SRC  = 'Escudo_DIM.webp';
+const STORE_KEY = 'dimfem_sorteo_v1';
+
+// LISTA DE JUGADORAS: para agregar o quitar una jugadora, edita esta lista.
+// El orden es el mismo en que aparecen en la pantalla de asistencia.
+const ROSTER = [
+  'Konny', 'Paula',
+  'Uschu', 'Meme Azócar', 'Vale C.', 'Nico', 'Vale G', 'Muri', 'Feña', 'Emi',
+  'Nati', 'Marcia', 'Cata', 'Kiara', 'Romi', 'Anto B.', 'Yi', 'Anto Jr.',
+  'Tania', 'Vinka', 'Damaris', 'Meme Estay', 'Tama', 'Lio',
+  'Profe Marco'
+];
+// Arqueras marcadas por defecto
+const DEFAULT_GK = ['Konny', 'Paula', 'Profe Marco'];
+const MARCO = 'Profe Marco';
+
+// ── ESTADO ────────────────────────────────────────────────────
+let present = new Set();
+let guests = [];
+let marks = {};              // nombre → { gk, lvl }
+let numTeams = 2;
+let teamOpts = [
+  { type: 'peto', text: '' },
+  { type: 'sin',  text: '' },
+  { type: 'otro', text: '' },
+  { type: 'otro', text: '' }
+];
+let result = null;
+
+// ── UTILIDADES ────────────────────────────────────────────────
+function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function shuffle(a) { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; }
+function showErr(id, msg) { const el = document.getElementById(id); el.textContent = msg || ''; el.classList.toggle('hidden', !msg); }
+let toastTimer;
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ present: [...present], marks, numTeams, teamOpts })); } catch (e) {}
+}
+function getMark(name) {
+  if (!marks[name]) marks[name] = { gk: DEFAULT_GK.includes(name), lvl: 0 };
+  return marks[name];
+}
+function getPlayers() {
+  return [...ROSTER.filter(n => present.has(n)), ...guests].map(name => ({ name, ...getMark(name) }));
+}
+
+// ── AVISO DE EQUIPOS DESPAREJOS ───────────────────────────────
+function renderNotice(id) {
+  const el = document.getElementById(id);
+  const n = present.size + guests.length;
+  const k = numTeams;
+  if (n < 2 || n % k === 0) { el.innerHTML = ''; return; }
+  const canMarco = !present.has(MARCO) && (n + 1) % k === 0;
+  const msg = k === 2
+    ? `Son ${n} jugadoras, número impar: un equipo quedará con una menos.`
+    : `Con ${n} jugadoras en ${k} equipos, los equipos quedan desparejos.`;
+  el.innerHTML = `<div class="notice">${msg}${canMarco ? `<br><button onclick="addMarco()">+ Agregar a Profe Marco de arquero</button>` : ''}</div>`;
+}
+function addMarco() {
+  present.add(MARCO);
+  getMark(MARCO).gk = true;
+  save();
+  renderStep1();
+  if (!document.getElementById('step2').classList.contains('hidden')) renderStep2();
+}
+
+// ── NAVEGACIÓN ────────────────────────────────────────────────
+function showStep(n) {
+  ['step1','step2','step3'].forEach((id, i) => document.getElementById(id).classList.toggle('hidden', i !== n - 1));
+  if (n === 1) renderStep1();
+  if (n === 2) renderStep2();
+  window.scrollTo({ top: 0 });
+}
+function goStep2() {
+  const n = present.size + guests.length;
+  if (n < 4) { showErr('err1', 'Marca al menos 4 jugadoras para armar equipos.'); return; }
+  showErr('err1', '');
+  showStep(2);
+}
+
+// ── PASO 1 ────────────────────────────────────────────────────
+function renderStep1() {
+  const n = present.size + guests.length;
+  document.getElementById('att-title').textContent = `Asistencia · ${n} presente${n !== 1 ? 's' : ''}`;
+  document.getElementById('att-grid').innerHTML = ROSTER.map((name, i) => {
+    const on = present.has(name);
+    const gk = getMark(name).gk ? ' 🧤' : '';
+    return `<button class="att${on ? ' on' : ''}" onclick="togglePresent(${i})" aria-pressed="${on}"><span class="ck">${on ? '✓' : ''}</span><span class="nm">${esc(name)}${gk}</span></button>`;
+  }).join('');
+  document.getElementById('guest-list').innerHTML = guests.map((g, i) =>
+    `<span class="guest-chip">${esc(g)}<button onclick="removeGuest(${i})" aria-label="Quitar a ${esc(g)}">✕</button></span>`).join('');
+  renderNotice('notice1');
+}
+function togglePresent(i) {
+  const name = ROSTER[i];
+  present.has(name) ? present.delete(name) : present.add(name);
+  save(); renderStep1();
+}
+function markAll(on) {
+  present = on ? new Set(ROSTER) : new Set();
+  save(); renderStep1();
+}
+function addGuest() {
+  const inp = document.getElementById('guest-input');
+  const name = inp.value.replace(/\s+/g, ' ').trim();
+  if (!name) return;
+  const taken = [...ROSTER, ...guests].some(n => n.toLowerCase() === name.toLowerCase());
+  if (taken) { toast(`"${name}" ya está en la lista. Usa otro nombre, por ejemplo con inicial.`); return; }
+  guests.push(name);
+  inp.value = ''; renderStep1(); inp.focus();
+}
+function removeGuest(i) { guests.splice(i, 1); renderStep1(); }
+
+// ── PASO 2 ────────────────────────────────────────────────────
+function renderStep2() {
+  const players = getPlayers();
+  document.getElementById('players-title').textContent = `Jugadoras (${players.length})`;
+  document.getElementById('players-list').innerHTML = players.map(p => {
+    const stars = p.lvl === 0 ? '☆☆☆' : `<span class="s-on">${'★'.repeat(p.lvl)}</span>${'☆'.repeat(3 - p.lvl)}`;
+    const key = esc(JSON.stringify(p.name));
+    return `<div class="p-row">
+      <span class="p-name">${esc(p.name)}</span>
+      <button class="p-btn gk${p.gk ? ' on' : ''}" onclick="toggleGk(${key})" aria-label="Marcar arquera">🧤</button>
+      <button class="p-btn lvl${p.lvl ? ' on' : ''}" onclick="cycleLvl(${key})" aria-label="Nivel de la jugadora">${stars}</button>
+    </div>`;
+  }).join('');
+  document.getElementById('teams-chips').innerHTML = [2, 3, 4].map(k =>
+    `<button class="chip${numTeams === k ? ' on' : ''}" onclick="setTeams(${k})">${k} equipos</button>`).join('');
+  renderNotice('notice2');
+  renderColors();
+}
+function toggleGk(name) { const m = getMark(name); m.gk = !m.gk; save(); renderStep2(); }
+function cycleLvl(name) { const m = getMark(name); m.lvl = (m.lvl + 1) % 4; save(); renderStep2(); }
+function setTeams(k) { numTeams = k; save(); renderStep2(); }
+
+function renderColors() {
+  let html = '';
+  for (let i = 0; i < numTeams; i++) {
+    const o = teamOpts[i];
+    html += `<div class="color-row">
+      <div class="color-label">Equipo ${i + 1}</div>
+      <div class="chips">
+        <button class="c-opt peto${o.type === 'peto' ? ' on' : ''}" onclick="setOpt(${i}, 'peto')">Peto amarillo</button>
+        <button class="c-opt sin${o.type === 'sin' ? ' on' : ''}" onclick="setOpt(${i}, 'sin')">Sin peto</button>
+        <input class="c-other${o.type === 'otro' && o.text ? ' on' : ''}" type="text" maxlength="20" placeholder="Otro color" value="${esc(o.type === 'otro' ? o.text : '')}" oninput="setOther(${i}, this)">
+      </div>
+    </div>`;
+  }
+  document.getElementById('colors-wrap').innerHTML = html;
+}
+function setOpt(i, type) {
+  // Peto y sin peto solo pueden estar en un equipo: si otro lo tiene, se intercambian
+  const other = teamOpts.findIndex((o, j) => j !== i && j < numTeams && o.type === type);
+  if (other !== -1) teamOpts[other] = { ...teamOpts[i] };
+  teamOpts[i] = { type, text: '' };
+  save(); renderColors();
+}
+function setOther(i, el) {
+  teamOpts[i] = { type: 'otro', text: el.value.trim() };
+  el.classList.toggle('on', !!el.value.trim());
+  el.parentElement.querySelectorAll('.c-opt').forEach(b => b.classList.remove('on'));
+  save();
+}
+function teamStyle(i) {
+  const o = teamOpts[i];
+  if (o.type === 'peto') return { name: 'Peto amarillo', emoji: '🟡', bg: '#facc15', fg: '#5c4400', border: '#e0b800' };
+  if (o.type === 'sin')  return { name: 'Sin peto', emoji: '⚪', bg: '#1b3a6b', fg: '#ffffff', border: '#1b3a6b' };
+  return { name: o.text || `Equipo ${i + 1}`, emoji: '', bg: '#5f6b7a', fg: '#ffffff', border: '#5f6b7a' };
+}
+
+// ── SORTEO ────────────────────────────────────────────────────
+function sortear() {
+  const players = getPlayers();
+  const k = numTeams, n = players.length;
+  if (n < k * 2) { showStep(2); showErr('err2', `Necesitas al menos ${k * 2} jugadoras para ${k} equipos.`); return; }
+  showErr('err2', '');
+
+  const base = Math.floor(n / k), extra = n % k;
+  const caps = shuffle(Array.from({ length: k }, (_, i) => i < extra ? base + 1 : base));
+  const teams = Array.from({ length: k }, (_, i) => ({ cap: caps[i], gks: [], field: [], sum: 0 }));
+  const size = t => t.gks.length + t.field.length;
+
+  // 1) Una arquera por equipo
+  const gks = shuffle(players.filter(p => p.gk));
+  let field = players.filter(p => !p.gk);
+  const order = shuffle([...Array(k).keys()]);
+  gks.forEach((p, i) => {
+    if (i < k) { teams[order[i]].gks.push(p); teams[order[i]].sum += p.lvl; }
+    else field.push(p);
+  });
+
+  // 2) Con nivel, de mayor a menor, al equipo con menos puntaje
+  // 3) El resto al azar, al equipo con menos jugadoras
+  field = shuffle(field).sort((a, b) => b.lvl - a.lvl);
+  field.forEach(p => {
+    const open = teams.filter(t => size(t) < t.cap);
+    let pool;
+    if (p.lvl > 0) {
+      const minSum = Math.min(...open.map(t => t.sum));
+      pool = open.filter(t => t.sum === minSum);
+    } else pool = open;
+    const minCount = Math.min(...pool.map(size));
+    const best = shuffle(pool.filter(t => size(t) === minCount))[0];
+    best.field.push(p); best.sum += p.lvl;
+  });
+
+  result = teams.map((t, i) => ({
+    style: teamStyle(i),
+    gks: t.gks.map(p => p.name),
+    field: shuffle(t.field).map(p => p.name)
+  }));
+  renderResult();
+  showStep(3);
+}
+
+function renderResult() {
+  document.getElementById('result-teams').innerHTML = result.map(t => {
+    const total = t.gks.length + t.field.length;
+    const items = [...t.gks.map(n => `<li>${esc(n)} 🧤</li>`), ...t.field.map(n => `<li>${esc(n)}</li>`)].join('');
+    return `<div class="team-card" style="border-color:${t.style.border}">
+      <div class="team-head" style="background:${t.style.bg};color:${t.style.fg}"><span class="team-name">${esc(t.style.name)}</span><span class="team-count">${total} jugadora${total !== 1 ? 's' : ''}</span></div>
+      <ul class="team-list">${items}</ul>
+    </div>`;
+  }).join('');
+}
+
+// ── TEXTO PARA WHATSAPP ───────────────────────────────────────
+function buildText() {
+  let s = '⚽ *Equipos DIM FEM*\n';
+  result.forEach(t => {
+    s += `\n${t.style.emoji ? t.style.emoji + ' ' : ''}*${t.style.name.toUpperCase()}*\n`;
+    t.gks.forEach(n => s += `${n} 🧤\n`);
+    t.field.forEach(n => s += `${n}\n`);
+  });
+  s += `\nSorteado con Sorteo de equipos DIM FEM ⚽\n${SHARE_URL}`;
+  return s;
+}
+async function copyText() {
+  const text = buildText();
+  try { await navigator.clipboard.writeText(text); }
+  catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); } catch (e2) {}
+    document.body.removeChild(ta);
+  }
+  toast('Texto copiado. Pégalo en el grupo de WhatsApp.');
+}
+
+// ── IMAGEN PARA COMPARTIR ─────────────────────────────────────
+function loadLogo() {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = LOGO_SRC;
+  });
+}
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+}
+async function drawImage(withLogo) {
+  try {
+    await Promise.all([
+      document.fonts.load('700 60px "Barlow Condensed"'),
+      document.fonts.load('500 36px "Barlow"')
+    ]);
+  } catch (e) {}
+  const logo = withLogo ? await loadLogo() : null;
+
+  const W = 1080, PAD = 60, LINE = 58, HEAD = 92;
+  const headerH = 230;
+  const teamH = t => HEAD + (t.gks.length + t.field.length) * LINE + 34;
+  const footerH = 130;
+  const H = headerH + 50 + result.reduce((a, t) => a + teamH(t) + 30, 0) + footerH;
+
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+
+  ctx.fillStyle = '#eef1f6'; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = '#1b3a6b'; ctx.fillRect(0, 0, W, headerH);
+  ctx.fillStyle = '#facc15'; ctx.fillRect(0, headerH - 8, W, 8);
+
+  const ls = 160, lx = PAD, ly = (headerH - 8 - ls) / 2;
+  if (logo) {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(lx + ls / 2, ly + ls / 2, ls / 2, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffffff'; ctx.fill(); ctx.clip();
+    ctx.drawImage(logo, lx, ly, ls, ls);
+    ctx.restore();
+  }
+  const tx = logo ? lx + ls + 36 : PAD;
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#ffffff'; ctx.font = '700 56px "Barlow Condensed", sans-serif';
+  ctx.fillText('SORTEO DE EQUIPOS', tx, headerH / 2 - 8);
+  ctx.fillStyle = '#facc15'; ctx.font = '700 84px "Barlow Condensed", sans-serif';
+  ctx.fillText('DIM FEM', tx, headerH / 2 + 70);
+
+  let y = headerH + 50;
+  result.forEach(t => {
+    const h = teamH(t), x = PAD, w = W - PAD * 2;
+    ctx.save();
+    roundRect(ctx, x, y, w, h, 22);
+    ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.lineWidth = 3; ctx.strokeStyle = t.style.border; ctx.stroke();
+    ctx.clip();
+    ctx.fillStyle = t.style.bg; ctx.fillRect(x, y, w, HEAD - 10);
+    ctx.restore();
+
+    ctx.fillStyle = t.style.fg; ctx.textAlign = 'left';
+    ctx.font = '700 50px "Barlow Condensed", sans-serif';
+    ctx.fillText(t.style.name.toUpperCase(), x + 40, y + 60);
+
+    let ny = y + HEAD + 38;
+    const names = [...t.gks.map(n => n + '  🧤'), ...t.field];
+    names.forEach((n, i) => {
+      if (i > 0) { ctx.fillStyle = '#eef1f6'; ctx.fillRect(x + 40, ny - LINE + 12, w - 80, 2); }
+      ctx.fillStyle = '#1a1a1a'; ctx.font = '500 36px "Barlow", sans-serif';
+      ctx.fillText(n, x + 44, ny);
+      ny += LINE;
+    });
+    y += h + 30;
+  });
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#5f6673'; ctx.font = '500 30px "Barlow", sans-serif';
+  ctx.fillText('Sorteado con Sorteo de equipos DIM FEM', W / 2, H - 76);
+  ctx.fillStyle = '#1b3a6b'; ctx.font = '600 28px "Barlow", sans-serif';
+  ctx.fillText(SHARE_URL, W / 2, H - 36);
+  return cv;
+}
+function canvasToBlob(cv) {
+  return new Promise((resolve, reject) => {
+    try { cv.toBlob(b => b ? resolve(b) : reject(new Error('blob')), 'image/png'); }
+    catch (e) { reject(e); }
+  });
+}
+async function shareImage() {
+  toast('Preparando imagen...');
+  let blob;
+  try { blob = await canvasToBlob(await drawImage(true)); }
+  catch (e) {
+    try { blob = await canvasToBlob(await drawImage(false)); }
+    catch (e2) { toast('No pudimos crear la imagen. Usa "Copiar texto".'); return; }
+  }
+  const file = new File([blob], 'equipos-dimfem.png', { type: 'image/png' });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { await navigator.share({ files: [file], title: 'Equipos DIM FEM' }); return; }
+    catch (e) { if (e && e.name === 'AbortError') return; }
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'equipos-dimfem.png';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  toast('Imagen descargada. Envíala desde tu galería.');
+}
+
+// ── INICIO ────────────────────────────────────────────────────
+(function init() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (s) {
+      present = new Set((s.present || []).filter(n => ROSTER.includes(n)));
+      marks = s.marks || {};
+      if ([2, 3, 4].includes(s.numTeams)) numTeams = s.numTeams;
+      if (Array.isArray(s.teamOpts) && s.teamOpts.length === 4) teamOpts = s.teamOpts;
+    }
+  } catch (e) {}
+  renderStep1();
+})();
+</script>
+</body>
+</html>
