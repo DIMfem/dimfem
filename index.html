@@ -101,6 +101,8 @@
   .team-list { list-style: none; padding: 4px 16px 8px; }
   .team-list li { padding: 7px 0; border-bottom: 1px solid #eef1f6; font-size: 16px; font-weight: 500; }
   .team-list li:last-child { border-bottom: none; }
+  .team-list li.rot { background: #fef9c3; color: var(--navy); font-size: 15px; font-weight: 600; margin: 4px -16px 0; padding: 8px 16px; border-bottom: none; }
+  .sheet-status { font-size: 13px; color: var(--gray-text); background: #fff8db; border: 1px solid #f2d55a; border-radius: 8px; padding: 7px 10px; margin-bottom: 10px; line-height: 1.45; }
 
   .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%) translateY(20px); background: var(--dark); color: #fff; padding: 11px 18px; border-radius: 10px; font-size: 14px; font-weight: 600; opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 300; max-width: calc(100vw - 32px); text-align: center; }
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -123,6 +125,7 @@
     <div class="step-label">Paso 1 de 3 · ¿Quiénes vinieron?</div>
     <div class="box">
       <div class="box-title" id="att-title">Asistencia</div>
+      <div id="sheet-status" class="sheet-status hidden"></div>
       <div class="att-tools">
         <button onclick="markAll(true)">Marcar todas</button>
         <button onclick="markAll(false)">Desmarcar todas</button>
@@ -147,7 +150,7 @@
     <div class="step-label">Paso 2 de 3 · Ajustes</div>
     <div class="box">
       <div class="box-title" id="players-title">Jugadoras</div>
-      <div class="help"><strong>Opcional:</strong> marca 🧤 a las arqueras y toca las estrellas para indicar el nivel de cada jugadora (★ básico, ★★ medio, ★★★ crack). Así el sorteo reparte parejo. Si no marcas nada, el sorteo es 100% al azar.</div>
+      <div class="help">Las posiciones y las arqueras 🧤 vienen de la planilla; aquí puedes cambiar el 🧤 si alguien ataja distinto.<br><strong>Opcional:</strong> toca las estrellas para indicar el nivel (★ básico, ★★ medio, ★★★ crack). El sorteo equilibra nivel y posiciones lo más parejo posible.</div>
       <div id="players-list"></div>
     </div>
     <div class="box">
@@ -185,25 +188,32 @@
 // ── CONFIGURACIÓN ─────────────────────────────────────────────
 const SHARE_URL = 'dimfem.github.io/dimfem';
 const LOGO_SRC  = 'Escudo_DIM.webp';
-const STORE_KEY = 'dimfem_sorteo_v1';
+const STORE_KEY = 'dimfem_sorteo_v1';     // asistencia, niveles, equipos y colores
+const SHEET_KEY = 'dimfem_planilla_v1';   // última versión cargada de la planilla
 
-// LISTA DE JUGADORAS: para agregar o quitar una jugadora, edita esta lista.
-// El orden es el mismo en que aparecen en la pantalla de asistencia.
-const ROSTER = [
-  'Konny', 'Paula',
-  'Uschu', 'Meme Azócar', 'Vale C.', 'Nico', 'Vale G', 'Muri', 'Feña', 'Emi',
-  'Nati', 'Marcia', 'Cata', 'Kiara', 'Romi', 'Anto B.', 'Yi', 'Anto Jr.',
-  'Tania', 'Vinka', 'Damaris', 'Meme Estay', 'Tama', 'Lio',
-  'Profe Marco'
+// PLANILLA: la lista de jugadoras, posiciones y arqueras se editan en Google Sheets.
+// Se lee la primera pestaña. Si algún día quieres usar otra, pon su número "gid" (sale en el link, #gid=...).
+const SHEET_ID  = '17XWldaZsg41lmvf6YJRyoVP2NOoQXHILtKwI7zP2HjA';
+const SHEET_GID = '';
+const SHEET_URLS = [
+  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv${SHEET_GID ? '&gid=' + SHEET_GID : ''}`,
+  `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv${SHEET_GID ? '&gid=' + SHEET_GID : ''}`
 ];
-// Arqueras marcadas por defecto
-const DEFAULT_GK = ['Konny', 'Paula', 'Profe Marco'];
+
+// Lista básica de emergencia: solo se usa si la planilla nunca se ha podido cargar en este celular.
+const FALLBACK_NAMES = [
+  'Konny', 'Paula', 'Uschu', 'Meme Azócar', 'Vale C.', 'Nico', 'Vale G', 'Muri', 'Feña', 'Emi',
+  'Nati', 'Marcia', 'Cata', 'Kiara', 'Romi', 'Anto B.', 'Yi', 'Anto Jr.',
+  'Tania', 'Vinka', 'Damaris', 'Meme Estay', 'Tama', 'Lio', 'Profe Marco'
+];
+const FALLBACK_GK = ['Konny', 'Paula', 'Profe Marco'];
 const MARCO = 'Profe Marco';
 
 // ── ESTADO ────────────────────────────────────────────────────
+let roster = [];             // [{ name, gk, pos: ['D','M','F'], poli }]
 let present = new Set();
 let guests = [];
-let marks = {};              // nombre → { gk, lvl }
+let marks = {};              // nombre → { lvl, gko }  (gko = arquera cambiada a mano)
 let numTeams = 2;
 let teamOpts = [
   { type: 'peto', text: '' },
@@ -212,10 +222,12 @@ let teamOpts = [
   { type: 'otro', text: '' }
 ];
 let result = null;
+let lastKey = '';
 
 // ── UTILIDADES ────────────────────────────────────────────────
 function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function shuffle(a) { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; }
+function norm(s) { return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase(); }
 function showErr(id, msg) { const el = document.getElementById(id); el.textContent = msg || ''; el.classList.toggle('hidden', !msg); }
 let toastTimer;
 function toast(msg) {
@@ -224,23 +236,105 @@ function toast(msg) {
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
 }
 function save() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify({ present: [...present], marks, numTeams, teamOpts })); } catch (e) {}
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ v: 2, present: [...present], marks, numTeams, teamOpts })); } catch (e) {}
 }
+function rosterNames() { return roster.map(r => r.name); }
+function rosterEntry(name) { return roster.find(r => r.name === name); }
 function getMark(name) {
-  if (!marks[name]) marks[name] = { gk: DEFAULT_GK.includes(name), lvl: 0 };
+  if (!marks[name]) marks[name] = { lvl: 0 };
   return marks[name];
 }
+function isGk(name) {
+  const m = marks[name];
+  if (m && typeof m.gko === 'boolean') return m.gko;
+  const r = rosterEntry(name);
+  return !!(r && r.gk);
+}
+function presentCount() { return roster.filter(r => present.has(r.name)).length + guests.length; }
 function getPlayers() {
-  return [...ROSTER.filter(n => present.has(n)), ...guests].map(name => ({ name, ...getMark(name) }));
+  const fromRoster = roster.filter(r => present.has(r.name)).map(r => ({ name: r.name, pos: r.pos, poli: r.poli }));
+  const fromGuests = guests.map(name => ({ name, pos: [], poli: false }));
+  return [...fromRoster, ...fromGuests].map(p => ({ ...p, gk: isGk(p.name), lvl: getMark(p.name).lvl || 0 }));
+}
+
+// ── PLANILLA ──────────────────────────────────────────────────
+function parseCSV(text) {
+  const rows = []; let row = [], f = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
+      else f += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(f); f = ''; }
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      row.push(f); rows.push(row); row = []; f = '';
+    } else f += c;
+  }
+  if (f !== '' || row.length) { row.push(f); rows.push(row); }
+  return rows;
+}
+// Casilla marcada (TRUE) o cualquier texto como "x" = sí. Vacío o FALSE = no.
+function isMarked(v) { const t = norm(v); return t !== '' && !['false', 'falso', '0', 'no'].includes(t); }
+function parseSheet(text) {
+  const rows = parseCSV(text);
+  const h = rows.findIndex(r => r.some(c => norm(c) === 'jugadora'));
+  if (h === -1) throw new Error('La planilla no tiene la columna "Jugadora".');
+  const head = rows[h].map(norm);
+  const col = name => head.indexOf(name);
+  const ci = { name: col('jugadora'), D: col('defensa'), M: col('mediocampo'), F: col('delantera'), GK: col('arquera'), P: col('polifuncional') };
+  const cell = (r, i) => (i >= 0 ? r[i] : '');
+  const seen = new Set(), list = [];
+  rows.slice(h + 1).forEach(r => {
+    const name = String(cell(r, ci.name) || '').replace(/\s+/g, ' ').trim();
+    if (!name || seen.has(name.toLowerCase())) return;
+    seen.add(name.toLowerCase());
+    list.push({
+      name,
+      gk: isMarked(cell(r, ci.GK)),
+      pos: ['D', 'M', 'F'].filter(p => isMarked(cell(r, ci[p]))),
+      poli: isMarked(cell(r, ci.P))
+    });
+  });
+  if (!list.length) throw new Error('La planilla está vacía.');
+  return list;
+}
+async function fetchSheet() {
+  let lastErr;
+  for (const url of SHEET_URLS) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+      const res = await fetch(url + (url.includes('?') ? '&' : '?') + 't=' + Date.now(), { signal: ctrl.signal, cache: 'no-store' });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      return parseSheet(await res.text());
+    } catch (e) { lastErr = e; }
+    finally { clearTimeout(timer); }
+  }
+  throw lastErr;
+}
+function setSheetStatus(msg) {
+  const el = document.getElementById('sheet-status');
+  el.textContent = msg || '';
+  el.classList.toggle('hidden', !msg);
+}
+function fmtDate(ts) {
+  const d = new Date(ts);
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+function rerenderVisible() {
+  if (!document.getElementById('step1').classList.contains('hidden')) renderStep1();
+  if (!document.getElementById('step2').classList.contains('hidden')) renderStep2();
 }
 
 // ── AVISO DE EQUIPOS DESPAREJOS ───────────────────────────────
 function renderNotice(id) {
   const el = document.getElementById(id);
-  const n = present.size + guests.length;
+  const n = presentCount();
   const k = numTeams;
   if (n < 2 || n % k === 0) { el.innerHTML = ''; return; }
-  const canMarco = !present.has(MARCO) && (n + 1) % k === 0;
+  const canMarco = rosterEntry(MARCO) && !present.has(MARCO) && (n + 1) % k === 0;
   const msg = k === 2
     ? `Son ${n} jugadoras, número impar: un equipo quedará con una menos.`
     : `Con ${n} jugadoras en ${k} equipos, los equipos quedan desparejos.`;
@@ -248,10 +342,9 @@ function renderNotice(id) {
 }
 function addMarco() {
   present.add(MARCO);
-  getMark(MARCO).gk = true;
+  if (!isGk(MARCO)) getMark(MARCO).gko = true;
   save();
-  renderStep1();
-  if (!document.getElementById('step2').classList.contains('hidden')) renderStep2();
+  rerenderVisible();
 }
 
 // ── NAVEGACIÓN ────────────────────────────────────────────────
@@ -262,39 +355,38 @@ function showStep(n) {
   window.scrollTo({ top: 0 });
 }
 function goStep2() {
-  const n = present.size + guests.length;
-  if (n < 4) { showErr('err1', 'Marca al menos 4 jugadoras para armar equipos.'); return; }
+  if (presentCount() < 4) { showErr('err1', 'Marca al menos 4 jugadoras para armar equipos.'); return; }
   showErr('err1', '');
   showStep(2);
 }
 
 // ── PASO 1 ────────────────────────────────────────────────────
 function renderStep1() {
-  const n = present.size + guests.length;
+  const n = presentCount();
   document.getElementById('att-title').textContent = `Asistencia · ${n} presente${n !== 1 ? 's' : ''}`;
-  document.getElementById('att-grid').innerHTML = ROSTER.map((name, i) => {
-    const on = present.has(name);
-    const gk = getMark(name).gk ? ' 🧤' : '';
-    return `<button class="att${on ? ' on' : ''}" onclick="togglePresent(${i})" aria-pressed="${on}"><span class="ck">${on ? '✓' : ''}</span><span class="nm">${esc(name)}${gk}</span></button>`;
+  document.getElementById('att-grid').innerHTML = roster.map((r, i) => {
+    const on = present.has(r.name);
+    const gk = isGk(r.name) ? ' 🧤' : '';
+    return `<button class="att${on ? ' on' : ''}" onclick="togglePresent(${i})" aria-pressed="${on}"><span class="ck">${on ? '✓' : ''}</span><span class="nm">${esc(r.name)}${gk}</span></button>`;
   }).join('');
   document.getElementById('guest-list').innerHTML = guests.map((g, i) =>
     `<span class="guest-chip">${esc(g)}<button onclick="removeGuest(${i})" aria-label="Quitar a ${esc(g)}">✕</button></span>`).join('');
   renderNotice('notice1');
 }
 function togglePresent(i) {
-  const name = ROSTER[i];
+  const name = roster[i].name;
   present.has(name) ? present.delete(name) : present.add(name);
   save(); renderStep1();
 }
 function markAll(on) {
-  present = on ? new Set(ROSTER) : new Set();
+  present = on ? new Set(rosterNames()) : new Set();
   save(); renderStep1();
 }
 function addGuest() {
   const inp = document.getElementById('guest-input');
   const name = inp.value.replace(/\s+/g, ' ').trim();
   if (!name) return;
-  const taken = [...ROSTER, ...guests].some(n => n.toLowerCase() === name.toLowerCase());
+  const taken = [...rosterNames(), ...guests].some(n => n.toLowerCase() === name.toLowerCase());
   if (taken) { toast(`"${name}" ya está en la lista. Usa otro nombre, por ejemplo con inicial.`); return; }
   guests.push(name);
   inp.value = ''; renderStep1(); inp.focus();
@@ -319,8 +411,15 @@ function renderStep2() {
   renderNotice('notice2');
   renderColors();
 }
-function toggleGk(name) { const m = getMark(name); m.gk = !m.gk; save(); renderStep2(); }
-function cycleLvl(name) { const m = getMark(name); m.lvl = (m.lvl + 1) % 4; save(); renderStep2(); }
+function toggleGk(name) {
+  const m = getMark(name);
+  const now = !isGk(name);
+  const r = rosterEntry(name);
+  const base = !!(r && r.gk);
+  if (now === base) delete m.gko; else m.gko = now;
+  save(); renderStep2();
+}
+function cycleLvl(name) { const m = getMark(name); m.lvl = ((m.lvl || 0) + 1) % 4; save(); renderStep2(); }
 function setTeams(k) { numTeams = k; save(); renderStep2(); }
 
 function renderColors() {
@@ -359,44 +458,100 @@ function teamStyle(i) {
 }
 
 // ── SORTEO ────────────────────────────────────────────────────
+// Prueba muchas repartijas y se queda con las más parejas en nivel y posiciones.
+// Reglas: una arquera por equipo (las que sobran juegan de campo); tamaños difieren máximo en 1;
+// polifuncional cuenta un poco en cada posición de campo, nunca en el arco;
+// quien juega varias posiciones cuenta repartida entre ellas; sin posición = relleno al azar.
+const W_LEVEL = 2, W_POS = 1;
+function variance(arr) { const m = arr.reduce((a, b) => a + b, 0) / arr.length; return arr.reduce((a, b) => a + (b - m) * (b - m), 0) / arr.length; }
+
+function balanceTeams(players, k, tries = 300) {
+  const n = players.length;
+  const w = players.map(p => {
+    if (p.poli) return [1 / 3, 1 / 3, 1 / 3];
+    if (!p.pos.length) return [0, 0, 0];
+    const f = 1 / p.pos.length;
+    return ['D', 'M', 'F'].map(x => p.pos.includes(x) ? f : 0);
+  });
+  const lv = players.map(p => p.lvl || 0);
+  const gkIdx = players.map((p, i) => p.gk ? i : -1).filter(i => i >= 0);
+
+  function cost(st) {
+    const lvlCost = variance(st.map(t => t.lvl));
+    let posCost = 0;
+    for (let d = 0; d < 3; d++) posCost += variance(st.map(t => t.pos[d]));
+    return W_LEVEL * lvlCost + W_POS * posCost;
+  }
+
+  const sols = new Map();
+  const base = Math.floor(n / k), extra = n % k;
+  for (let t = 0; t < tries; t++) {
+    const caps = shuffle(Array.from({ length: k }, (_, i) => i < extra ? base + 1 : base));
+    const teams = Array.from({ length: k }, () => ({ gk: -1, field: [] }));
+    const gks = shuffle(gkIdx);
+    const order = shuffle([...Array(k).keys()]);
+    gks.slice(0, k).forEach((g, i) => { teams[order[i]].gk = g; });
+    const fieldPool = shuffle(players.map((_, i) => i).filter(i => !gks.slice(0, k).includes(i)));
+    let fp = 0;
+    teams.forEach((tm, i) => { const need = caps[i] - (tm.gk >= 0 ? 1 : 0); for (let j = 0; j < need; j++) tm.field.push(fieldPool[fp++]); });
+
+    const st = teams.map(tm => {
+      const s = { lvl: tm.gk >= 0 ? lv[tm.gk] : 0, pos: [0, 0, 0] };
+      tm.field.forEach(i => { s.lvl += lv[i]; for (let d = 0; d < 3; d++) s.pos[d] += w[i][d]; });
+      return s;
+    });
+    let cur = cost(st);
+
+    // Mejora: intercambia jugadoras de campo (o arqueras) entre equipos mientras el resultado mejore
+    for (let pass = 0, improved = true; improved && pass < 30; pass++) {
+      improved = false;
+      for (let a = 0; a < k; a++) for (let b = a + 1; b < k; b++) {
+        const A = teams[a], B = teams[b];
+        for (const ia of shuffle([...A.field.keys()])) for (const ib of shuffle([...B.field.keys()])) {
+          const x = A.field[ia], y = B.field[ib];
+          if (lv[x] === lv[y] && w[x].every((v, d) => v === w[y][d])) continue;
+          st[a].lvl += lv[y] - lv[x]; st[b].lvl += lv[x] - lv[y];
+          for (let d = 0; d < 3; d++) { st[a].pos[d] += w[y][d] - w[x][d]; st[b].pos[d] += w[x][d] - w[y][d]; }
+          const c = cost(st);
+          if (c < cur - 1e-9) { cur = c; A.field[ia] = y; B.field[ib] = x; improved = true; }
+          else {
+            st[a].lvl -= lv[y] - lv[x]; st[b].lvl -= lv[x] - lv[y];
+            for (let d = 0; d < 3; d++) { st[a].pos[d] -= w[y][d] - w[x][d]; st[b].pos[d] -= w[x][d] - w[y][d]; }
+          }
+        }
+        if (A.gk >= 0 && B.gk >= 0 && lv[A.gk] !== lv[B.gk]) {
+          const d = lv[B.gk] - lv[A.gk];
+          st[a].lvl += d; st[b].lvl -= d;
+          const c = cost(st);
+          if (c < cur - 1e-9) { cur = c; [A.gk, B.gk] = [B.gk, A.gk]; improved = true; }
+          else { st[a].lvl -= d; st[b].lvl += d; }
+        }
+      }
+    }
+    const key = teams.map(tm => [tm.gk, ...tm.field.slice().sort((p, q) => p - q)].join(',')).join('|');
+    if (!sols.has(key)) sols.set(key, { cost: cur, teams: teams.map(tm => ({ gk: tm.gk, field: tm.field.slice() })) });
+  }
+
+  // Elige al azar entre las mejores, evitando repetir el sorteo anterior
+  const all = [...sols.entries()].sort((p, q) => p[1].cost - q[1].cost);
+  const best = all[0][1].cost;
+  let pool = all.filter(([, s]) => s.cost <= best + 0.13);
+  if (pool.length < 3) pool = all.filter(([, s]) => s.cost <= best + 0.35);
+  if (pool.length > 1) pool = pool.filter(([key]) => key !== lastKey);
+  const [key, pick] = pool[Math.floor(Math.random() * pool.length)];
+  lastKey = key;
+  return pick.teams.map(tm => ({ gk: tm.gk >= 0 ? players[tm.gk] : null, field: tm.field.map(i => players[i]) }));
+}
+
 function sortear() {
   const players = getPlayers();
   const k = numTeams, n = players.length;
   if (n < k * 2) { showStep(2); showErr('err2', `Necesitas al menos ${k * 2} jugadoras para ${k} equipos.`); return; }
   showErr('err2', '');
-
-  const base = Math.floor(n / k), extra = n % k;
-  const caps = shuffle(Array.from({ length: k }, (_, i) => i < extra ? base + 1 : base));
-  const teams = Array.from({ length: k }, (_, i) => ({ cap: caps[i], gks: [], field: [], sum: 0 }));
-  const size = t => t.gks.length + t.field.length;
-
-  // 1) Una arquera por equipo
-  const gks = shuffle(players.filter(p => p.gk));
-  let field = players.filter(p => !p.gk);
-  const order = shuffle([...Array(k).keys()]);
-  gks.forEach((p, i) => {
-    if (i < k) { teams[order[i]].gks.push(p); teams[order[i]].sum += p.lvl; }
-    else field.push(p);
-  });
-
-  // 2) Con nivel, de mayor a menor, al equipo con menos puntaje
-  // 3) El resto al azar, al equipo con menos jugadoras
-  field = shuffle(field).sort((a, b) => b.lvl - a.lvl);
-  field.forEach(p => {
-    const open = teams.filter(t => size(t) < t.cap);
-    let pool;
-    if (p.lvl > 0) {
-      const minSum = Math.min(...open.map(t => t.sum));
-      pool = open.filter(t => t.sum === minSum);
-    } else pool = open;
-    const minCount = Math.min(...pool.map(size));
-    const best = shuffle(pool.filter(t => size(t) === minCount))[0];
-    best.field.push(p); best.sum += p.lvl;
-  });
-
+  const teams = balanceTeams(players, k);
   result = teams.map((t, i) => ({
     style: teamStyle(i),
-    gks: t.gks.map(p => p.name),
+    gks: t.gk ? [t.gk.name] : [],
     field: shuffle(t.field).map(p => p.name)
   }));
   renderResult();
@@ -406,7 +561,8 @@ function sortear() {
 function renderResult() {
   document.getElementById('result-teams').innerHTML = result.map(t => {
     const total = t.gks.length + t.field.length;
-    const items = [...t.gks.map(n => `<li>${esc(n)} 🧤</li>`), ...t.field.map(n => `<li>${esc(n)}</li>`)].join('');
+    const rot = t.gks.length ? '' : '<li class="rot">🧤 Arco rotativo</li>';
+    const items = rot + [...t.gks.map(n => `<li>${esc(n)} 🧤</li>`), ...t.field.map(n => `<li>${esc(n)}</li>`)].join('');
     return `<div class="team-card" style="border-color:${t.style.border}">
       <div class="team-head" style="background:${t.style.bg};color:${t.style.fg}"><span class="team-name">${esc(t.style.name)}</span><span class="team-count">${total} jugadora${total !== 1 ? 's' : ''}</span></div>
       <ul class="team-list">${items}</ul>
@@ -419,6 +575,7 @@ function buildText() {
   let s = '⚽ *Equipos DIM FEM*\n';
   result.forEach(t => {
     s += `\n${t.style.emoji ? t.style.emoji + ' ' : ''}*${t.style.name.toUpperCase()}*\n`;
+    if (!t.gks.length) s += '🧤 Arco rotativo\n';
     t.gks.forEach(n => s += `${n} 🧤\n`);
     t.field.forEach(n => s += `${n}\n`);
   });
@@ -458,14 +615,16 @@ async function drawImage(withLogo) {
   try {
     await Promise.all([
       document.fonts.load('700 60px "Barlow Condensed"'),
-      document.fonts.load('500 36px "Barlow"')
+      document.fonts.load('500 36px "Barlow"'),
+      document.fonts.load('600 34px "Barlow"')
     ]);
   } catch (e) {}
   const logo = withLogo ? await loadLogo() : null;
 
   const W = 1080, PAD = 60, LINE = 58, HEAD = 92;
   const headerH = 230;
-  const teamH = t => HEAD + (t.gks.length + t.field.length) * LINE + 34;
+  const rows = t => t.gks.length + t.field.length + (t.gks.length ? 0 : 1);
+  const teamH = t => HEAD + rows(t) * LINE + 34;
   const footerH = 130;
   const H = headerH + 50 + result.reduce((a, t) => a + teamH(t) + 30, 0) + footerH;
 
@@ -508,6 +667,12 @@ async function drawImage(withLogo) {
     ctx.fillText(t.style.name.toUpperCase(), x + 40, y + 60);
 
     let ny = y + HEAD + 38;
+    if (!t.gks.length) {
+      ctx.fillStyle = '#fef9c3'; ctx.fillRect(x + 3, ny - LINE + 16, w - 6, LINE);
+      ctx.fillStyle = '#1b3a6b'; ctx.font = '600 34px "Barlow", sans-serif';
+      ctx.fillText('🧤  Arco rotativo', x + 44, ny);
+      ny += LINE;
+    }
     const names = [...t.gks.map(n => n + '  🧤'), ...t.field];
     names.forEach((n, i) => {
       if (i > 0) { ctx.fillStyle = '#eef1f6'; ctx.fillRect(x + 40, ny - LINE + 12, w - 80, 2); }
@@ -557,13 +722,37 @@ async function shareImage() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
     if (s) {
-      present = new Set((s.present || []).filter(n => ROSTER.includes(n)));
-      marks = s.marks || {};
+      present = new Set(s.present || []);
+      const m = s.marks || {};
+      // Versión anterior: las arqueras se guardaban aquí; ahora vienen de la planilla
+      if (s.v !== 2) Object.keys(m).forEach(n => { m[n] = { lvl: m[n].lvl || 0 }; });
+      marks = m;
       if ([2, 3, 4].includes(s.numTeams)) numTeams = s.numTeams;
       if (Array.isArray(s.teamOpts) && s.teamOpts.length === 4) teamOpts = s.teamOpts;
     }
   } catch (e) {}
+
+  let cache = null;
+  try { cache = JSON.parse(localStorage.getItem(SHEET_KEY) || 'null'); } catch (e) {}
+  if (cache && Array.isArray(cache.roster) && cache.roster.length) {
+    roster = cache.roster;
+  } else {
+    cache = null;
+    roster = FALLBACK_NAMES.map(name => ({ name, gk: FALLBACK_GK.includes(name), pos: [], poli: false }));
+    setSheetStatus('Cargando la lista desde la planilla...');
+  }
   renderStep1();
+
+  fetchSheet().then(list => {
+    roster = list;
+    try { localStorage.setItem(SHEET_KEY, JSON.stringify({ ts: Date.now(), roster: list })); } catch (e) {}
+    setSheetStatus('');
+    rerenderVisible();
+  }).catch(() => {
+    setSheetStatus(cache
+      ? `No se pudo conectar con la planilla. Se usa la lista guardada el ${fmtDate(cache.ts)}.`
+      : 'No se pudo cargar la planilla. Se usa una lista básica, sin posiciones.');
+  });
 })();
 </script>
 </body>
